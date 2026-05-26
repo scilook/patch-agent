@@ -1,0 +1,5 @@
+{"timestamp":"2026-05-17T09:10:04Z","level":"INFO","event":"db_initialized","details":{"status":"ok","db_path":"/var/lib/vuln-patch-agent/vuln_patch.db"}}
+{"timestamp":"2026-05-17T09:11:12Z","level":"INFO","event":"nvd_sync_completed","details":{"started_from":"2026-05-10T09:11:00Z","ended_at":"2026-05-17T09:11:12Z","pages":1,"vulnerabilities_upserted":52,"affected_rows_upserted":104}}
+{"timestamp":"2026-05-17T09:15:46Z","level":"INFO","event":"scan_completed","details":{"total_installed_packages":1284,"vulnerable_findings":4,"vulnerable_packages":3}}
+{"timestamp":"2026-05-17T09:17:18Z","level":"INFO","event":"patch_completed","details":{"target_count":3,"status":"success","mitigation_success_rate":75.0}}
+{"timestamp":"2026-05-17T09:18:00Z","level":"INFO","event":"report_generated","details":{"report_output":"/var/log/vuln-patch-agent/latest_report.json"}}

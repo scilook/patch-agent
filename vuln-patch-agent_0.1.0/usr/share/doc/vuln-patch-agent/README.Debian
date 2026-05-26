@@ -1,0 +1,49 @@
+vuln-patch-agent (MVP)
+======================
+
+This package provides a CLI-based vulnerability discovery and selective patch
+agent for Ubuntu 22.04.
+
+Installed files
+---------------
+- /usr/bin/patch-agent
+- /usr/lib/vuln-patch-agent/patch_agent.py
+- /etc/vuln-patch-agent/config.json
+
+Post-install behavior
+---------------------
+- Creates a non-login service account: patch-agent
+- Creates runtime directories:
+  - /var/lib/vuln-patch-agent
+  - /var/log/vuln-patch-agent
+- Installs selective sudo policy in /etc/sudoers.d/patch-agent:
+  - apt-get update
+  - apt-get install --only-upgrade *
+- Initializes SQLite DB schema.
+
+Typical commands
+----------------
+Note: Runtime directories are owned by the non-login service account
+`patch-agent` (mode 0750). Run commands as root (e.g. via sudo) or as the
+service account.
+
+As root (recommended for interactive admin use)
+------------------------------------------------
+sudo patch-agent init-db
+sudo patch-agent sync-nvd --max-pages 1
+sudo patch-agent scan
+sudo patch-agent patch --dry-run
+sudo patch-agent report
+
+As patch-agent (recommended for automated/service use)
+-----------------------------------------------------
+sudo runuser -u patch-agent -- patch-agent init-db
+sudo runuser -u patch-agent -- patch-agent sync-nvd --max-pages 1
+sudo runuser -u patch-agent -- patch-agent scan
+sudo runuser -u patch-agent -- patch-agent patch --dry-run
+sudo runuser -u patch-agent -- patch-agent report
+
+Backward compatibility
+----------------------
+- Legacy command `/usr/bin/vuln-patch-agent` is kept as a wrapper to
+  `/usr/bin/patch-agent`.

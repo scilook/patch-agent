@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-05-17T09:15:46Z",
+  "total_installed_packages": 1284,
+  "vulnerable_findings": 4,
+  "vulnerable_packages": 3,
+  "packages": [
+    {
+      "package": "openssl",
+      "installed_version": "3.0.2-0ubuntu1.16",
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2024-1234",
+          "cvss_score": 8.8,
+          "source_product": "openssl",
+          "reasoning": "product=openssl, installed=3.0.2-0ubuntu1.16, range_start=3.0.0(inc), range_end=3.0.2(inc)"
+        },
+        {
+          "cve_id": "CVE-2024-2451",
+          "cvss_score": 6.5,
+          "source_product": "openssl",
+          "reasoning": "product=openssl, installed=3.0.2-0ubuntu1.16, range_start=* (inc), range_end=3.0.2(inc)"
+        }
+      ]
+    },
+    {
+      "package": "curl",
+      "installed_version": "7.81.0-1ubuntu1.15",
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2023-5678",
+          "cvss_score": 7.5,
+          "source_product": "curl",
+          "reasoning": "product=curl, installed=7.81.0-1ubuntu1.15, range_start=7.80.0(inc), range_end=7.81.0(inc)"
+        }
+      ]
+    },
+    {
+      "package": "libxml2",
+      "installed_version": "2.9.13+dfsg-1ubuntu0.5",
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2024-4321",
+          "cvss_score": 5.6,
+          "source_product": "libxml2",
+          "reasoning": "product=libxml2, installed=2.9.13+dfsg-1ubuntu0.5, range_start=2.9.0(inc), range_end=2.9.14(exc)"
+        }
+      ]
+    }
+  ]
+}
