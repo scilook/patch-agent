@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'fs/promises';
+import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,6 +15,31 @@ const defaultPaths = (dataRoot) => ({
   scanPath: path.join(dataRoot, 'log', 'vuln-patch-agent', 'latest_scan.json'),
   reportPath: path.join(dataRoot, 'log', 'vuln-patch-agent', 'latest_report.json'),
 });
+
+async function loadDotEnv(envPath) {
+  try {
+    const content = await fs.readFile(envPath, 'utf-8');
+    content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'))
+      .forEach((line) => {
+        const eq = line.indexOf('=');
+        if (eq === -1) return;
+        const key = line.slice(0, eq).trim();
+        let val = line.slice(eq + 1).trim();
+        if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+          val = val.slice(1, -1);
+        }
+        // prefer explicit process.env values, but allow override if not set
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      });
+  } catch (_) {
+    // ignore missing .env
+  }
+}
 
 function readJsonConfig(configPath) {
   if (!configPath) {
@@ -30,6 +56,9 @@ async function resolveRuntimeConfig() {
   const envConfigPath = process.env.PATCH_AGENT_FE_CONFIG || '';
   const envDataRoot = process.env.PATCH_AGENT_DATA_ROOT || process.env.PATCH_AGENT_DATA_DIR || '';
   const envPort = process.env.PORT || process.env.PATCH_AGENT_FE_PORT || '';
+  // load .env candidates early so process.env may contain NVD key
+  await loadDotEnv(path.resolve(projectRoot, '.env'));
+  await loadDotEnv(path.resolve(defaultDataRoot, '.env'));
   const fileConfig = await readJsonConfig(envConfigPath);
 
   const dataRoot = path.resolve(fileConfig.dataRoot || envDataRoot || defaultDataRoot);
@@ -41,6 +70,7 @@ async function resolveRuntimeConfig() {
     auditLogPath: path.resolve(fileConfig.auditLogPath || resolvedDefaults.auditLogPath),
     scanPath: path.resolve(fileConfig.scanPath || resolvedDefaults.scanPath),
     reportPath: path.resolve(fileConfig.reportPath || resolvedDefaults.reportPath),
+    nvdApiKey: process.env.NVD_API_KEY || fileConfig.nvd_api_key || null,
     configPath: envConfigPath || null,
   };
 }
@@ -51,6 +81,28 @@ async function fileExists(filePath) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function execCommand(command, args = [], opts = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, Object.assign({ stdio: ['ignore', 'pipe', 'pipe'] }, opts));
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (c) => (stdout += String(c)));
+    child.stderr.on('data', (c) => (stderr += String(c)));
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    child.on('error', (err) => resolve({ code: 1, stdout: '', stderr: String(err) }));
+  });
+}
+
+async function writeAudit(event, details = {}) {
+  try {
+    const entry = { timestamp: new Date().toISOString(), event, details };
+    await fs.mkdir(path.dirname(runtimeConfig.auditLogPath), { recursive: true });
+    await fs.appendFile(runtimeConfig.auditLogPath, JSON.stringify(entry) + '\n');
+  } catch (err) {
+    // ignore audit failures
   }
 }
 
@@ -176,6 +228,7 @@ function buildSummary(config, report, scan, auditEntries) {
 async function main() {
   const runtimeConfig = await resolveRuntimeConfig();
   const app = express();
+  app.use(express.json());
 
   app.get('/api/health', (_, response) => {
     response.json({ ok: true });
@@ -193,6 +246,119 @@ async function main() {
       runtime: runtimeConfig,
       status,
     });
+  });
+
+  // Settings endpoints: read/write runtime config including optional NVD API key
+  app.get('/api/settings', async (_, response) => {
+    const candidatePath = runtimeConfig.configPath && (await fileExists(runtimeConfig.configPath)) ? runtimeConfig.configPath : path.join(runtimeConfig.dataRoot, 'config.json');
+    const fileConfig = (await readJsonFile(candidatePath)) || {};
+
+    const envKey = process.env.NVD_API_KEY || null;
+    const maskedFileConfig = Object.assign({}, fileConfig);
+    if (maskedFileConfig.nvd_api_key) maskedFileConfig.nvd_api_key = '*****';
+
+    response.json({
+      ok: true,
+      configPath: candidatePath,
+      fileConfig: maskedFileConfig,
+      envKeyPresent: !!envKey,
+      nvdApiKeySource: envKey ? 'env' : fileConfig.nvd_api_key ? 'file' : null,
+    });
+  });
+
+  app.post('/api/settings/nvd-key', async (req, response) => {
+    // Write API key into project root .env to share with other tooling
+    const apiKey = req.body?.apiKey;
+    if (!apiKey || typeof apiKey !== 'string') {
+      return response.status(400).json({ ok: false, error: 'apiKey is required in request body' });
+    }
+
+    const dotenvPath = path.join(projectRoot, '.env');
+    try {
+      // Read existing .env (if any) and replace or append NVD_API_KEY
+      let content = '';
+      try {
+        content = await fs.readFile(dotenvPath, 'utf-8');
+      } catch (_) {
+        content = '';
+      }
+
+      const lines = content.split('\n').filter(Boolean);
+      const filtered = lines.filter((l) => !/^\s*NVD_API_KEY\s*=/.test(l));
+      filtered.push(`NVD_API_KEY=${apiKey}`);
+      await fs.writeFile(dotenvPath, filtered.join('\n') + '\n', { mode: 0o600 });
+      // also set in current process for immediate use
+      process.env.NVD_API_KEY = apiKey;
+      response.json({ ok: true, dotenvPath });
+    } catch (err) {
+      response.status(500).json({ ok: false, error: String(err) });
+    }
+  });
+
+  // Package management API
+  const validPkgName = (name) => typeof name === 'string' && /^[A-Za-z0-9+:.@_\-]+$/.test(name);
+
+  app.get('/api/packages', async (_, response) => {
+    // list installed packages via dpkg-query
+    const res = await execCommand('dpkg-query', ['-W', '-f=${Package}\t${Version}\n']);
+    if (res.code !== 0) {
+      return response.status(500).json({ ok: false, error: res.stderr || 'dpkg-query failed' });
+    }
+    const lines = res.stdout.trim().split('\n').filter(Boolean);
+    const packages = lines.map((ln) => {
+      const [pkg, ver] = ln.split('\t');
+      return { package: pkg, version: ver };
+    });
+    response.json({ ok: true, packages });
+  });
+
+  app.get('/api/package/:name', async (req, response) => {
+    const name = req.params.name;
+    if (!validPkgName(name)) return response.status(400).json({ ok: false, error: 'invalid package name' });
+    const res = await execCommand('apt-cache', ['policy', name]);
+    response.json({ ok: true, raw: res.stdout, code: res.code, stderr: res.stderr });
+  });
+
+  app.post('/api/packages/install', async (req, response) => {
+    const name = req.body?.name;
+    if (!validPkgName(name)) return response.status(400).json({ ok: false, error: 'invalid package name' });
+    await writeAudit('install_requested', { package: name });
+    const res = await execCommand('apt-get', ['update']);
+    const inst = await execCommand('apt-get', ['install', '-y', '--no-install-recommends', name]);
+    await writeAudit('install_result', { package: name, code: inst.code, stderr: inst.stderr });
+    response.json({ ok: inst.code === 0, code: inst.code, stdout: inst.stdout, stderr: inst.stderr });
+  });
+
+  app.post('/api/packages/remove', async (req, response) => {
+    const name = req.body?.name;
+    if (!validPkgName(name)) return response.status(400).json({ ok: false, error: 'invalid package name' });
+    await writeAudit('remove_requested', { package: name });
+    const res = await execCommand('apt-get', ['remove', '-y', name]);
+    await writeAudit('remove_result', { package: name, code: res.code, stderr: res.stderr });
+    response.json({ ok: res.code === 0, code: res.code, stdout: res.stdout, stderr: res.stderr });
+  });
+
+  app.post('/api/packages/upgrade', async (req, response) => {
+    const name = req.body?.name;
+    if (name) {
+      if (!validPkgName(name)) return response.status(400).json({ ok: false, error: 'invalid package name' });
+      await writeAudit('upgrade_requested', { package: name });
+      const res = await execCommand('apt-get', ['install', '-y', '--only-upgrade', name]);
+      await writeAudit('upgrade_result', { package: name, code: res.code, stderr: res.stderr });
+      return response.json({ ok: res.code === 0, code: res.code, stdout: res.stdout, stderr: res.stderr });
+    }
+
+    await writeAudit('upgrade_all_requested', {});
+    const res = await execCommand('apt-get', ['upgrade', '-y']);
+    await writeAudit('upgrade_all_result', { code: res.code, stderr: res.stderr });
+    response.json({ ok: res.code === 0, code: res.code, stdout: res.stdout, stderr: res.stderr });
+  });
+
+  app.post('/api/packages/update-cache', async (req, response) => {
+    await writeAudit('update_cache_requested', {});
+    const res = await execCommand('apt-get', ['update']);
+    await writeAudit('update_cache_result', { code: res.code, stderr: res.stderr });
+    response.json({ ok: res.code === 0, code: res.code, stdout: res.stdout, stderr: res.stderr });
   });
 
   app.get('/api/summary', async (_, response) => {

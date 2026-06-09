@@ -3,7 +3,7 @@ set -eu
 
 PATCH_AGENT_BIN="${PATCH_AGENT_BIN:-/usr/bin/patch-agent}"
 CONFIG_PATH="/etc/vuln-patch-agent/config.json"
-API_KEY_ENV="NVD_API_KEY"
+API_KEY_ENV="8C37B456-4D64-F111-836B-129478FCB64D"
 AGENT_USER="patch-agent"
 PATCH_MODE="none"
 DO_REPORT=1

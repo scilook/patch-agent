@@ -70,6 +70,9 @@ export default function App() {
     summary: null,
     config: null,
   });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [installName, setInstallName] = useState('');
+  const [actionMessage, setActionMessage] = useState(null);
 
   async function loadData() {
     setState((current) => ({ ...current, loading: true, error: null }));
@@ -109,6 +112,53 @@ export default function App() {
   useEffect(() => {
     loadData();
   }, []);
+
+  async function postJson(path, body) {
+    setActionMessage(null);
+    setActionLoading(true);
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      setActionLoading(false);
+      if (!res.ok) {
+        setActionMessage(data.error || `request failed ${res.status}`);
+        return { ok: false, data };
+      }
+      setActionMessage('작업이 완료되었습니다. 목록을 새로고침하세요.');
+      return { ok: true, data };
+    } catch (err) {
+      setActionLoading(false);
+      setActionMessage(String(err));
+      return { ok: false, data: null };
+    }
+  }
+
+  async function installPackage(name) {
+    if (!name) return setActionMessage('패키지 이름을 입력하세요.');
+    const r = await postJson('/api/packages/install', { name });
+    if (r.ok) await loadData();
+  }
+
+  async function removePackage(name) {
+    if (!confirm(`${name} 패키지를 제거하시겠습니까?`)) return;
+    const r = await postJson('/api/packages/remove', { name });
+    if (r.ok) await loadData();
+  }
+
+  async function upgradePackage(name) {
+    const body = name ? { name } : {};
+    const r = await postJson('/api/packages/upgrade', body);
+    if (r.ok) await loadData();
+  }
+
+  async function updateCache() {
+    const r = await postJson('/api/packages/update-cache', {});
+    if (r.ok) await loadData();
+  }
 
   const packageRows = useMemo(() => state.summary?.packages || [], [state.summary]);
   const auditEntries = state.summary?.audit?.entries || [];
@@ -189,7 +239,11 @@ export default function App() {
           />
           <StatCard
             label="완화율"
-            value={metrics.mitigationRate === null || metrics.mitigationRate === undefined ? '-' : `${metrics.mitigationRate}%`}
+            value={
+              metrics.mitigationRate === null || metrics.mitigationRate === undefined
+                ? '-'
+                : `${metrics.mitigationRate}%`
+            }
             hint="latest report 기준"
           />
         </section>
@@ -201,6 +255,47 @@ export default function App() {
             description="설치된 패키지 버전, 매칭된 CVE, 그리고 위험도 점수를 우선순위로 정렬해 보여줍니다."
           />
 
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                placeholder="설치할 패키지 이름"
+                value={installName}
+                onChange={(e) => setInstallName(e.target.value)}
+                className="input"
+                aria-label="install-name"
+              />
+              <button
+                className="primary-button"
+                onClick={() => installPackage(installName)}
+                disabled={actionLoading}
+                type="button"
+              >
+                설치
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="secondary-button"
+                onClick={updateCache}
+                disabled={actionLoading}
+                type="button"
+              >
+                패키지 캐시 갱신
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => upgradePackage()}
+                disabled={actionLoading}
+                type="button"
+              >
+                전체 업그레이드
+              </button>
+            </div>
+
+            {actionMessage ? <div className="action-message">{actionMessage}</div> : null}
+          </div>
+
           <div className="table-wrap">
             <table>
               <thead>
@@ -210,6 +305,7 @@ export default function App() {
                   <th>취약점</th>
                   <th>최대 점수</th>
                   <th>CVE 목록</th>
+                  <th>작업</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,8 +328,28 @@ export default function App() {
                             </span>
                           ))}
                           {pkg.vulnerabilities.length > 3 ? (
-                            <span className="cve-chip muted">+{pkg.vulnerabilities.length - 3}</span>
+                            <span className="cve-chip muted">
+                              +{pkg.vulnerabilities.length - 3}
+                            </span>
                           ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            className="secondary-button"
+                            onClick={() => upgradePackage(pkg.package)}
+                            type="button"
+                          >
+                            업그레이드
+                          </button>
+                          <button
+                            className="danger-button"
+                            onClick={() => removePackage(pkg.package)}
+                            type="button"
+                          >
+                            제거
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -324,9 +440,12 @@ export default function App() {
 
           <ul className="audit-list">
             {auditEntries.length ? (
-              auditEntries.slice().reverse().map((entry, index) => (
-                <AuditRow entry={entry} key={`${entry.timestamp}-${entry.event}-${index}`} />
-              ))
+              auditEntries
+                .slice()
+                .reverse()
+                .map((entry, index) => (
+                  <AuditRow entry={entry} key={`${entry.timestamp}-${entry.event}-${index}`} />
+                ))
             ) : (
               <li className="empty-state compact">감사 로그가 없습니다.</li>
             )}

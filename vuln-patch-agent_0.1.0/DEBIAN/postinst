@@ -51,4 +51,16 @@ if [ -x /usr/bin/patch-agent ]; then
     chown -R "$AGENT_USER:$AGENT_GROUP" "$STATE_DIR" "$LOG_DIR" 2>/dev/null || true
 fi
 
+# Install systemd units (if systemd present)
+if command -v systemctl >/dev/null 2>&1; then
+    if [ -d /lib/systemd/system ]; then
+        cp -a /lib/systemd/system/vuln-patch-agent.service /lib/systemd/system/vuln-patch-agent.service
+    fi
+    if [ -d /lib/systemd/system ]; then
+        cp -a /lib/systemd/system/vuln-patch-agent.timer /lib/systemd/system/vuln-patch-agent.timer
+    fi
+    systemctl daemon-reload || true
+    systemctl enable --now vuln-patch-agent.timer >/dev/null 2>&1 || true
+fi
+
 exit 0
