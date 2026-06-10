@@ -1,23 +1,36 @@
 {
-  "generated_at": "2026-04-28T11:32:40Z",
+  "generated_at": "2026-06-09T22:40:35Z",
   "latest_scan": {
-    "timestamp": "2026-04-28T11:32:31Z",
-    "total_installed_packages": 581,
-    "vulnerable_findings": 0,
-    "vulnerable_packages": 0,
-    "packages": []
+    "timestamp": "2026-06-09T22:40:34Z",
+    "total_installed_packages": 1057,
+    "vulnerable_findings": 1,
+    "vulnerable_packages": 1,
+    "packages": [
+      {
+        "package": "bash",
+        "installed_version": "5.1-6ubuntu1.1",
+        "vulnerabilities": [
+          {
+            "cve_id": "CVE-TEST-0001",
+            "cvss_score": 7.8,
+            "source_product": "bash",
+            "reasoning": "product=bash, installed=5.1-6ubuntu1.1, range_start=5.0(inc), range_end=5.2(inc)"
+          }
+        ]
+      }
+    ]
   },
   "latest_patch": {
-    "timestamp": "2026-04-28T11:32:31Z",
+    "timestamp": "2026-06-09T22:40:34Z",
     "dry_run": true,
     "targets": [
       "bash"
     ],
     "target_count": 1,
     "before_findings": 1,
-    "after_findings": 0,
-    "mitigated_findings": 1,
-    "mitigation_success_rate": 100.0,
+    "after_findings": 1,
+    "mitigated_findings": 0,
+    "mitigation_success_rate": 0.0,
     "commands": {
       "update": {
         "command": "sudo /usr/bin/apt-get update",
@@ -30,5 +43,5 @@
     },
     "status": "success"
   },
-  "mitigation_success_rate": 100.0
+  "mitigation_success_rate": 0.0
 }

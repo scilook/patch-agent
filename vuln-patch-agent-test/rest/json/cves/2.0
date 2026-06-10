@@ -1,6 +1,45 @@
 {
   "resultsPerPage": 2000,
   "startIndex": 0,
-  "totalResults": 0,
-  "vulnerabilities": []
+  "totalResults": 1,
+  "vulnerabilities": [
+    {
+      "cve": {
+        "id": "CVE-TEST-0001",
+        "descriptions": [
+          {
+            "lang": "en",
+            "value": "Test vulnerability in bash package"
+          }
+        ],
+        "metrics": {
+          "cvssMetricV31": [
+            {
+              "cvssData": {
+                "baseScore": 7.8
+              }
+            }
+          ]
+        },
+        "published": "2026-06-01T00:00:00Z",
+        "lastModified": "2026-06-10T00:00:00Z",
+        "configurations": [
+          {
+            "nodes": [
+              {
+                "cpeMatch": [
+                  {
+                    "vulnerable": true,
+                    "criteria": "cpe:2.3:a:gnu:bash:*:*:*:*:*:*:*:*",
+                    "versionStartIncluding": "5.0",
+                    "versionEndIncluding": "5.2"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -35,12 +35,20 @@ async function resolveRuntimeConfig() {
   const dataRoot = path.resolve(fileConfig.dataRoot || envDataRoot || defaultDataRoot);
   const resolvedDefaults = defaultPaths(dataRoot);
 
+  const directAuditPath = path.join(dataRoot, 'audit.log');
+  const directScanPath = path.join(dataRoot, 'latest_scan.json');
+  const directReportPath = path.join(dataRoot, 'latest_report.json');
+
+  const finalAuditPath = (await fileExists(directAuditPath)) ? directAuditPath : resolvedDefaults.auditLogPath;
+  const finalScanPath = (await fileExists(directScanPath)) ? directScanPath : resolvedDefaults.scanPath;
+  const finalReportPath = (await fileExists(directReportPath)) ? directReportPath : resolvedDefaults.reportPath;
+
   return {
     port: Number(envPort || fileConfig.port || 4173),
     dataRoot,
-    auditLogPath: path.resolve(fileConfig.auditLogPath || resolvedDefaults.auditLogPath),
-    scanPath: path.resolve(fileConfig.scanPath || resolvedDefaults.scanPath),
-    reportPath: path.resolve(fileConfig.reportPath || resolvedDefaults.reportPath),
+    auditLogPath: path.resolve(fileConfig.auditLogPath || fileConfig.audit_log || finalAuditPath),
+    scanPath: path.resolve(fileConfig.scanPath || fileConfig.scan_output || finalScanPath),
+    reportPath: path.resolve(fileConfig.reportPath || fileConfig.report_output || finalReportPath),
     configPath: envConfigPath || null,
   };
 }

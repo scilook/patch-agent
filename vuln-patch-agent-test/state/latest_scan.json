@@ -1,7 +1,20 @@
 {
-  "timestamp": "2026-04-28T11:32:46Z",
-  "total_installed_packages": 581,
-  "vulnerable_findings": 0,
-  "vulnerable_packages": 0,
-  "packages": []
+  "timestamp": "2026-06-09T22:40:33Z",
+  "total_installed_packages": 1057,
+  "vulnerable_findings": 1,
+  "vulnerable_packages": 1,
+  "packages": [
+    {
+      "package": "bash",
+      "installed_version": "5.1-6ubuntu1.1",
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-TEST-0001",
+          "cvss_score": 7.8,
+          "source_product": "bash",
+          "reasoning": "product=bash, installed=5.1-6ubuntu1.1, range_start=5.0(inc), range_end=5.2(inc)"
+        }
+      ]
+    }
+  ]
 }
