@@ -1,0 +1,14 @@
+[Unit]
+Description=vuln-patch-agent periodic runner
+After=network.target
+
+[Service]
+Type=oneshot
+User=patch-agent
+Group=patch-agent
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/patch-agent run --api-key-env NVD_API_KEY --output /var/log/vuln-patch-agent/latest_run.json
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

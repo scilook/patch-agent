@@ -1,0 +1,10 @@
+[Unit]
+Description=Run vuln-patch-agent daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=vuln-patch-agent.service
+
+[Install]
+WantedBy=timers.target
